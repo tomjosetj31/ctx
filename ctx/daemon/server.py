@@ -12,10 +12,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import signal
 import socket
 import sys
+import threading
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Make sure the project root is importable when run as __main__
@@ -24,10 +28,116 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from ctx.store.workspace_store import WorkspaceStore
+from ctx.adapters.vpn.registry import VPNAdapterRegistry
 
 _CTX_DIR = Path.home() / ".ctx"
 _SOCKET_PATH = _CTX_DIR / "daemon.sock"
 _PID_PATH = _CTX_DIR / "daemon.pid"
+
+logger = logging.getLogger(__name__)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class VPNPoller:
+    """Background thread that polls VPN state and appends events to the action log.
+
+    Polls every *poll_interval* seconds. On a state transition
+    (None→connected or connected→None) it appends a ``vpn_connect`` or
+    ``vpn_disconnect`` action dict to the shared *actions* list.
+    """
+
+    def __init__(
+        self,
+        actions: list[dict],
+        poll_interval: float = 2.0,
+    ) -> None:
+        self._actions = actions
+        self._poll_interval = poll_interval
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._last_state: bool | None = None  # None = unknown, True = connected
+        self._last_client: str = ""
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def start(self) -> None:
+        """Start the polling thread."""
+        self._thread = threading.Thread(target=self._run, daemon=True, name="vpn-poller")
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Signal the polling thread to stop and wait for it to finish."""
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=self._poll_interval + 1)
+
+    # ------------------------------------------------------------------
+    # Polling loop
+    # ------------------------------------------------------------------
+
+    def _run(self) -> None:
+        """Main polling loop — runs in a background thread."""
+        try:
+            registry = VPNAdapterRegistry()
+        except Exception as exc:
+            logger.warning("VPNPoller: could not initialise registry: %s", exc)
+            return
+
+        while not self._stop_event.is_set():
+            try:
+                self._poll(registry)
+            except Exception as exc:
+                logger.warning("VPNPoller: poll error: %s", exc)
+            self._stop_event.wait(timeout=self._poll_interval)
+
+    def _poll(self, registry) -> None:
+        """Check current VPN state and emit an event if it changed."""
+        result = registry.detect_active()
+        if result is not None:
+            _adapter, state = result
+            currently_connected = True
+            client = state.client
+            profile = state.profile
+        else:
+            currently_connected = False
+            client = self._last_client
+            profile = None
+
+        if self._last_state is None:
+            # First poll — record baseline without emitting an event
+            self._last_state = currently_connected
+            self._last_client = client
+            return
+
+        if currently_connected and not self._last_state:
+            # Transition: disconnected → connected
+            self._actions.append(
+                {
+                    "type": "vpn_connect",
+                    "client": client,
+                    "profile": profile,
+                    "timestamp": _now_iso(),
+                }
+            )
+            self._last_client = client
+        elif not currently_connected and self._last_state:
+            # Transition: connected → disconnected
+            self._actions.append(
+                {
+                    "type": "vpn_disconnect",
+                    "client": self._last_client,
+                    "timestamp": _now_iso(),
+                }
+            )
+
+        self._last_state = currently_connected
+        if currently_connected:
+            self._last_client = client
 
 
 class RecorderDaemon:
@@ -40,6 +150,7 @@ class RecorderDaemon:
         self._running = False
         self._sock: socket.socket | None = None
         self._workspace_id: int | None = None
+        self._vpn_poller: VPNPoller | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -70,6 +181,10 @@ class RecorderDaemon:
 
         # Handle SIGTERM for clean shutdown
         signal.signal(signal.SIGTERM, self._handle_signal)
+
+        # Start VPN poller
+        self._vpn_poller = VPNPoller(self._actions)
+        self._vpn_poller.start()
 
         self._loop()
 
@@ -163,6 +278,10 @@ class RecorderDaemon:
         self._running = False
 
     def _cleanup(self) -> None:
+        # Stop the VPN poller first
+        if self._vpn_poller is not None:
+            self._vpn_poller.stop()
+
         if self._sock:
             try:
                 self._sock.close()
