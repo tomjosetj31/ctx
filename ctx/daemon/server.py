@@ -32,6 +32,12 @@ from ctx.adapters.vpn.registry import VPNAdapterRegistry
 from ctx.adapters.browser.registry import BrowserAdapterRegistry
 from ctx.adapters.ide.registry import IDEAdapterRegistry
 from ctx.adapters.terminal.registry import TerminalAdapterRegistry
+from ctx.adapters.aerospace.adapter import (
+    AeroSpaceAdapter,
+    BROWSER_APP_NAMES,
+    IDE_APP_NAMES,
+    TERMINAL_APP_NAMES,
+)
 
 _CTX_DIR = Path.home() / ".ctx"
 _SOCKET_PATH = _CTX_DIR / "daemon.sock"
@@ -192,14 +198,16 @@ class BrowserPoller:
             logger.warning("BrowserPoller: could not initialise registry: %s", exc)
             return
 
+        aerospace = AeroSpaceAdapter() if AeroSpaceAdapter().is_available() else None
+
         while not self._stop_event.is_set():
             try:
-                self._poll(registry)
+                self._poll(registry, aerospace)
             except Exception as exc:
                 logger.warning("BrowserPoller: poll error: %s", exc)
             self._stop_event.wait(timeout=self._poll_interval)
 
-    def _poll(self, registry) -> None:
+    def _poll(self, registry, aerospace: AeroSpaceAdapter | None) -> None:
         """Check current browser tabs and emit events for newly opened URLs."""
         for adapter in registry.available_adapters():
             current_urls = set(adapter.get_open_tabs())
@@ -209,14 +217,19 @@ class BrowserPoller:
                 continue
             new_urls = current_urls - self._known_tabs[adapter.name]
             for url in sorted(new_urls):
-                self._actions.append(
-                    {
-                        "type": "browser_tab_open",
-                        "browser": adapter.name,
-                        "url": url,
-                        "timestamp": _now_iso(),
-                    }
-                )
+                action: dict = {
+                    "type": "browser_tab_open",
+                    "browser": adapter.name,
+                    "url": url,
+                    "timestamp": _now_iso(),
+                }
+                if aerospace is not None:
+                    app_name = BROWSER_APP_NAMES.get(adapter.name)
+                    if app_name:
+                        ws = aerospace.get_app_workspace(app_name)
+                        if ws:
+                            action["workspace"] = ws
+                self._actions.append(action)
             self._known_tabs[adapter.name] = current_urls
 
 
@@ -269,14 +282,16 @@ class IDEPoller:
             logger.warning("IDEPoller: could not initialise registry: %s", exc)
             return
 
+        aerospace = AeroSpaceAdapter() if AeroSpaceAdapter().is_available() else None
+
         while not self._stop_event.is_set():
             try:
-                self._poll(registry)
+                self._poll(registry, aerospace)
             except Exception as exc:
                 logger.warning("IDEPoller: poll error: %s", exc)
             self._stop_event.wait(timeout=self._poll_interval)
 
-    def _poll(self, registry) -> None:
+    def _poll(self, registry, aerospace: AeroSpaceAdapter | None) -> None:
         """Check current IDE projects and emit events for newly opened paths."""
         for adapter in registry.available_adapters():
             current_paths = set(adapter.get_open_projects())
@@ -286,14 +301,19 @@ class IDEPoller:
                 continue
             new_paths = current_paths - self._known_projects[adapter.name]
             for path in sorted(new_paths):
-                self._actions.append(
-                    {
-                        "type": "ide_project_open",
-                        "client": adapter.name,
-                        "path": path,
-                        "timestamp": _now_iso(),
-                    }
-                )
+                action: dict = {
+                    "type": "ide_project_open",
+                    "client": adapter.name,
+                    "path": path,
+                    "timestamp": _now_iso(),
+                }
+                if aerospace is not None:
+                    app_name = IDE_APP_NAMES.get(adapter.name)
+                    if app_name:
+                        ws = aerospace.get_app_workspace(app_name)
+                        if ws:
+                            action["workspace"] = ws
+                self._actions.append(action)
             self._known_projects[adapter.name] = current_paths
 
 
@@ -346,14 +366,16 @@ class TerminalPoller:
             logger.warning("TerminalPoller: could not initialise registry: %s", exc)
             return
 
+        aerospace = AeroSpaceAdapter() if AeroSpaceAdapter().is_available() else None
+
         while not self._stop_event.is_set():
             try:
-                self._poll(registry)
+                self._poll(registry, aerospace)
             except Exception as exc:
                 logger.warning("TerminalPoller: poll error: %s", exc)
             self._stop_event.wait(timeout=self._poll_interval)
 
-    def _poll(self, registry) -> None:
+    def _poll(self, registry, aerospace: AeroSpaceAdapter | None) -> None:
         """Check current terminal sessions and emit events for newly opened dirs."""
         for adapter in registry.available_adapters():
             current_dirs = set(adapter.get_open_dirs())
@@ -363,14 +385,19 @@ class TerminalPoller:
                 continue
             new_dirs = current_dirs - self._known_dirs[adapter.name]
             for path in sorted(new_dirs):
-                self._actions.append(
-                    {
-                        "type": "terminal_session_open",
-                        "app": adapter.name,
-                        "directory": path,
-                        "timestamp": _now_iso(),
-                    }
-                )
+                action: dict = {
+                    "type": "terminal_session_open",
+                    "app": adapter.name,
+                    "directory": path,
+                    "timestamp": _now_iso(),
+                }
+                if aerospace is not None:
+                    app_name = TERMINAL_APP_NAMES.get(adapter.name)
+                    if app_name:
+                        ws = aerospace.get_app_workspace(app_name)
+                        if ws:
+                            action["workspace"] = ws
+                self._actions.append(action)
             self._known_dirs[adapter.name] = current_dirs
 
 
