@@ -26,16 +26,16 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Topic :: Utilities",
 ]
+dependencies = [
+    "click>=8.1",
+    "PyYAML>=6.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/tomjosetj31/spaceload"
 Repository = "https://github.com/tomjosetj31/spaceload"
 "Bug Tracker" = "https://github.com/tomjosetj31/spaceload/issues"
 Changelog = "https://github.com/tomjosetj31/spaceload/blob/master/CHANGELOG.md"
-dependencies = [
-    "click>=8.1",
-    "PyYAML>=6.0",
-]
 
 [project.scripts]
 spaceload = "spaceload.cli.main:cli"
