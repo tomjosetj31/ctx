@@ -1,5 +1,9 @@
 # ctx — Workspace Context Switcher
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 A macOS CLI tool that records and replays developer workspace setups: browser tabs, VPN connections, IDE projects, and terminal sessions.
 
 ## Overview
@@ -148,6 +152,12 @@ cat ~/.ctx/replay.log
 - SQLite (stdlib) for persistence
 - PyYAML for export/import
 - Unix domain sockets for CLI↔daemon IPC
+
+## Contributing
+
+Contributions are welcome! Whether it's a bug fix, a new adapter for an app you use, or a documentation improvement — all PRs are appreciated.
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to set up the project locally, run tests, and submit a pull request.
 
 ## License
 
