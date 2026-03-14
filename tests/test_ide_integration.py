@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from loadout.daemon.server import IDEPoller
-from loadout.replayer.replayer import Replayer
+from spaceload.daemon.server import IDEPoller
+from spaceload.replayer.replayer import Replayer
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ class TestIDEPollerIntegration:
         mock_registry = MagicMock()
         mock_registry.available_adapters.side_effect = fake_available_adapters
 
-        with patch("loadout.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
+        with patch("spaceload.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
             poller.start()
             time.sleep(0.3)
             poller.stop()
@@ -65,7 +65,7 @@ class TestIDEPollerIntegration:
         mock_registry = MagicMock()
         mock_registry.available_adapters.return_value = [adapter]
 
-        with patch("loadout.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
+        with patch("spaceload.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
             poller.start()
             time.sleep(0.08)
             poller.stop()
@@ -83,7 +83,7 @@ class TestIDEPollerIntegration:
         mock_registry = MagicMock()
         mock_registry.available_adapters.return_value = [adapter]
 
-        with patch("loadout.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
+        with patch("spaceload.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
             poller.start()
             time.sleep(0.3)
             poller.stop()
@@ -111,7 +111,7 @@ class TestIDEPollerIntegration:
         mock_registry = MagicMock()
         mock_registry.available_adapters.side_effect = fake_available_adapters
 
-        with patch("loadout.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
+        with patch("spaceload.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
             poller.start()
             time.sleep(0.3)
             poller.stop()
@@ -132,7 +132,7 @@ class TestIDEPollerIntegration:
         mock_registry = MagicMock()
         mock_registry.available_adapters.side_effect = RuntimeError("storage read error")
 
-        with patch("loadout.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
+        with patch("spaceload.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
             poller.start()
             time.sleep(0.2)
             poller.stop()
@@ -163,7 +163,7 @@ class TestIDEPollerIntegration:
         mock_registry = MagicMock()
         mock_registry.available_adapters.side_effect = fake_available_adapters
 
-        with patch("loadout.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
+        with patch("spaceload.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
             poller.start()
             time.sleep(0.3)
             poller.stop()
@@ -200,7 +200,7 @@ class TestIDEPollerIntegration:
         mock_registry = MagicMock()
         mock_registry.available_adapters.side_effect = fake_available_adapters
 
-        with patch("loadout.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
+        with patch("spaceload.daemon.server.IDEAdapterRegistry", return_value=mock_registry):
             poller.start()
             time.sleep(0.3)
             poller.stop()

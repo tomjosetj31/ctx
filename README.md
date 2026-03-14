@@ -1,4 +1,4 @@
-# Loadout — Workspace Context Switcher
+# Spaceload — Workspace Context Switcher
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -8,7 +8,7 @@ A macOS CLI tool that records and replays developer workspace setups: browser ta
 
 ## Overview
 
-`loadout` lets you snapshot your entire development environment and restore it later with a single command. Stop context-switching overhead and get back into flow faster.
+`spaceload` lets you snapshot your entire development environment and restore it later with a single command. Stop context-switching overhead and get back into flow faster.
 
 ## Features
 
@@ -20,8 +20,8 @@ A macOS CLI tool that records and replays developer workspace setups: browser ta
 ## Installation
 
 ```bash
-git clone https://github.com/tomjosetj31/loadout
-cd loadout
+git clone https://github.com/tomjosetj31/spaceload
+cd spaceload
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -31,39 +31,39 @@ pip install -e .
 
 ```bash
 # Start recording a workspace session
-loadout record my-project
+spaceload record my-project
 
 # ... open your browser tabs, connect VPN, open IDE, etc. ...
 
 # Stop recording and save the session
-loadout stop
+spaceload stop
 
 # Replay a saved workspace
-loadout run my-project
+spaceload run my-project
 
 # List all saved workspaces
-loadout list
+spaceload list
 
 # Inspect a workspace as YAML
-loadout show my-project
+spaceload show my-project
 
 # Delete a workspace
-loadout delete my-project
+spaceload delete my-project
 
 # Import a workspace from a YAML file
-loadout import my-project.yaml
+spaceload import my-project.yaml
 ```
 
 ### Recording Options
 
 ```bash
 # Record only new things opened during recording (default)
-loadout record my-project
+spaceload record my-project
 
 # Also capture everything already open when recording starts
-loadout record my-project --include-open
+spaceload record my-project --include-open
 # or
-loadout record my-project -i
+spaceload record my-project -i
 ```
 
 ## Supported Integrations
@@ -103,10 +103,10 @@ To track terminal commands during recording, add the shell hook to your shell co
 
 ```bash
 # For zsh (~/.zshrc):
-eval "$(loadout shell-hook zsh)"
+eval "$(spaceload shell-hook zsh)"
 
 # For bash (~/.bashrc):
-eval "$(loadout shell-hook bash)"
+eval "$(spaceload shell-hook bash)"
 ```
 
 Then restart your shell or run `source ~/.zshrc`.
@@ -127,23 +127,23 @@ The recorder automatically filters out:
 
 ## Logs & Debugging
 
-Logs are written to `~/.loadout/` for debugging:
+Logs are written to `~/.spaceload/` for debugging:
 
 ```bash
 # Daemon log (recording)
-cat ~/.loadout/daemon.log
+cat ~/.spaceload/daemon.log
 
 # Replay log
-cat ~/.loadout/replay.log
+cat ~/.spaceload/replay.log
 ```
 
 ## Architecture
 
-- **CLI** (`loadout/cli/`) — Click-based command interface
-- **Daemon** (`loadout/daemon/`) — Unix socket server that records actions in the background
-- **Store** (`loadout/store/`) — SQLite-backed persistence layer with YAML export/import
-- **Replayer** (`loadout/replayer/`) — Replays recorded action sequences
-- **Adapters** (`loadout/adapters/`) — Per-integration plugins (browser, VPN, IDE, terminal)
+- **CLI** (`spaceload/cli/`) — Click-based command interface
+- **Daemon** (`spaceload/daemon/`) — Unix socket server that records actions in the background
+- **Store** (`spaceload/store/`) — SQLite-backed persistence layer with YAML export/import
+- **Replayer** (`spaceload/replayer/`) — Replays recorded action sequences
+- **Adapters** (`spaceload/adapters/`) — Per-integration plugins (browser, VPN, IDE, terminal)
 
 ## Tech Stack
 

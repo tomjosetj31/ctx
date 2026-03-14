@@ -7,11 +7,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from loadout.adapters.wm.base import WMWindow, WorkspaceManagerAdapter
-from loadout.adapters.wm.aerospace import AeroSpaceAdapter
-from loadout.adapters.wm.yabai import YabaiAdapter
-from loadout.adapters.wm.registry import WorkspaceManagerRegistry
-from loadout.adapters.wm.app_names import BROWSER_APP_NAMES, IDE_APP_NAMES, TERMINAL_APP_NAMES
+from spaceload.adapters.wm.base import WMWindow, WorkspaceManagerAdapter
+from spaceload.adapters.wm.aerospace import AeroSpaceAdapter
+from spaceload.adapters.wm.yabai import YabaiAdapter
+from spaceload.adapters.wm.registry import WorkspaceManagerRegistry
+from spaceload.adapters.wm.app_names import BROWSER_APP_NAMES, IDE_APP_NAMES, TERMINAL_APP_NAMES
 
 
 # ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from loadout.store.workspace_store import WorkspaceStore
+from spaceload.store.workspace_store import WorkspaceStore
 
 
 @pytest.fixture
