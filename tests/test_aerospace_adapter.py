@@ -202,7 +202,7 @@ class TestBrowserPollerWorkspaceEnrichment:
              patch("spaceload.daemon.server.WorkspaceManagerRegistry") as mock_reg_cls:
             mock_reg_cls.return_value.detect_active.return_value = mock_wm
             poller.start()
-            time.sleep(0.4)  # Wait for stabilization
+            time.sleep(1.0)  # Wait for stabilization (generous for CI runners)
             poller.stop()
 
         open_actions = [a for a in actions if a.get("type") == "browser_tab_open"]
