@@ -78,11 +78,10 @@ class Replayer:
         return self._terminal_registry
 
     def _get_aerospace(self):
-        """Return an AeroSpaceAdapter if available, else None. Cached after first call."""
+        """Return the active workspace manager adapter, or None. Cached after first call."""
         if self._aerospace is _SENTINEL:
-            from ctx.adapters.aerospace.adapter import AeroSpaceAdapter
-            adapter = AeroSpaceAdapter()
-            self._aerospace = adapter if adapter.is_available() else None
+            from ctx.adapters.wm.registry import WorkspaceManagerRegistry
+            self._aerospace = WorkspaceManagerRegistry().detect_active()
         return self._aerospace
 
     def replay(self) -> None:
@@ -169,7 +168,7 @@ class Replayer:
 
     def _handle_browser_tab_open(self, index: int, action: dict[str, Any]) -> None:
         """Replay a browser_tab_open action using the appropriate adapter."""
-        from ctx.adapters.aerospace.adapter import BROWSER_APP_NAMES
+        from ctx.adapters.wm.app_names import BROWSER_APP_NAMES
         browser = action.get("browser", "")
         url = action.get("url", "")
         workspace = action.get("workspace")
@@ -206,7 +205,7 @@ class Replayer:
 
     def _handle_ide_project_open(self, index: int, action: dict[str, Any]) -> None:
         """Replay an ide_project_open action using the appropriate adapter."""
-        from ctx.adapters.aerospace.adapter import IDE_APP_NAMES
+        from ctx.adapters.wm.app_names import IDE_APP_NAMES
         client = action.get("client", "")
         path = action.get("path", "")
         workspace = action.get("workspace")
@@ -241,7 +240,7 @@ class Replayer:
 
     def _handle_terminal_session_open(self, index: int, action: dict[str, Any]) -> None:
         """Replay a terminal_session_open action using the appropriate adapter."""
-        from ctx.adapters.aerospace.adapter import TERMINAL_APP_NAMES
+        from ctx.adapters.wm.app_names import TERMINAL_APP_NAMES
         app = action.get("app", "")
         directory = action.get("directory", "")
         workspace = action.get("workspace")
