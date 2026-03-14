@@ -397,15 +397,40 @@ class TerminalPoller:
             self._known_dirs[adapter.name] = current_dirs
 
 
-class WindowSnapshotPoller:
-    """Tracks ANY application that opens during recording using the window manager.
+def _get_running_foreground_apps() -> set[str]:
+    """Return names of all visible (foreground) apps via AppleScript.
 
-    Works completely independent of specific adapters — if AeroSpace or yabai is
-    running, every new window that appears (Teams, Slack, Firefox, Photoshop,
-    Blender, anything) is recorded as an ``app_open`` event with its workspace.
+    Used as a fallback when no tiling WM is available.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "osascript", "-e",
+                "tell application \"System Events\" to return name of every process"
+                " whose background only is false",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return set()
+        return {name.strip() for name in result.stdout.split(",")}
+    except (subprocess.SubprocessError, OSError):
+        return set()
+
+
+class WindowSnapshotPoller:
+    """Tracks ANY application that opens during recording.
+
+    Two modes:
+    - **WM mode** (AeroSpace / yabai present): uses ``wm.list_windows()`` to
+      detect new windows with their workspace labels.
+    - **Fallback mode** (no WM): polls the macOS process list via AppleScript
+      and records new foreground apps without workspace information.
 
     Apps already handled by richer adapters (Chrome, Safari, VS Code, iTerm2,
-    etc.) are skipped here to avoid duplicate events.
+    etc.) are skipped in both modes to avoid duplicate events.
     """
 
     # OS-level app names handled by specific pollers — skip them here
@@ -427,8 +452,11 @@ class WindowSnapshotPoller:
         self._poll_interval = poll_interval
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+        # WM mode state
         self._seen_ids: set[int] = set()
         self._wm: object | None = None
+        # Fallback mode state
+        self._seen_apps: set[str] = set()
 
     def start(self) -> None:
         self._thread = threading.Thread(
@@ -443,31 +471,39 @@ class WindowSnapshotPoller:
 
     def _run(self) -> None:
         self._wm = WorkspaceManagerRegistry().detect_active()
-        if self._wm is None:
-            logger.info("WindowSnapshotPoller: no WM detected — generic app tracking disabled")
-            return
-        # Seed with windows that are already open so we don't record pre-existing apps
-        try:
-            initial = self._wm.list_windows()
-            self._seen_ids = {w.window_id for w in initial}
-        except Exception as exc:
-            logger.warning("WindowSnapshotPoller: could not get initial window list: %s", exc)
+
+        if self._wm is not None:
+            # WM mode — seed with currently open windows
+            try:
+                initial = self._wm.list_windows()
+                self._seen_ids = {w.window_id for w in initial}
+            except Exception as exc:
+                logger.warning("WindowSnapshotPoller: could not get initial window list: %s", exc)
+            logger.info("WindowSnapshotPoller: WM mode (%s)", type(self._wm).__name__)
+        else:
+            # Fallback mode — seed with currently running apps
+            self._seen_apps = _get_running_foreground_apps()
+            logger.info("WindowSnapshotPoller: fallback mode (no WM detected)")
 
         while not self._stop_event.is_set():
             try:
-                self._poll()
+                if self._wm is not None:
+                    self._poll_wm()
+                else:
+                    self._poll_fallback()
             except Exception as exc:
                 logger.warning("WindowSnapshotPoller: poll error: %s", exc)
             self._stop_event.wait(timeout=self._poll_interval)
 
-    def _poll(self) -> None:
+    def _poll_wm(self) -> None:
+        """WM mode: detect new windows and record app + workspace."""
         windows = self._wm.list_windows()
         for w in windows:
             if w.window_id in self._seen_ids:
                 continue
             self._seen_ids.add(w.window_id)
             if w.app_name in self._MANAGED_OS_NAMES:
-                continue  # richer adapter already handles this app
+                continue
             action: dict = {
                 "type": "app_open",
                 "app_name": w.app_name,
@@ -476,6 +512,22 @@ class WindowSnapshotPoller:
             }
             self._actions.append(action)
             logger.info("WindowSnapshotPoller: new app — %r workspace=%s", w.app_name, w.workspace)
+
+    def _poll_fallback(self) -> None:
+        """Fallback mode: detect new foreground apps, no workspace info."""
+        current = _get_running_foreground_apps()
+        new_apps = current - self._seen_apps
+        for app_name in sorted(new_apps):
+            if app_name in self._MANAGED_OS_NAMES:
+                continue
+            action: dict = {
+                "type": "app_open",
+                "app_name": app_name,
+                "timestamp": _now_iso(),
+            }
+            self._actions.append(action)
+            logger.info("WindowSnapshotPoller: new app (no WM) — %r", app_name)
+        self._seen_apps = current
 
 
 class RecorderDaemon:

@@ -48,7 +48,7 @@ class TestWindowSnapshotPoller:
 
         # New window appears
         mock_wm.list_windows.return_value = [_make_window(42, "Microsoft Teams", "1")]
-        poller._poll()
+        poller._poll_wm()
 
         assert len(actions) == 1
         assert actions[0]["type"] == "app_open"
@@ -64,7 +64,7 @@ class TestWindowSnapshotPoller:
 
         # Chrome is managed by BrowserPoller — should be skipped
         mock_wm.list_windows.return_value = [_make_window(10, "Google Chrome", "2")]
-        poller._poll()
+        poller._poll_wm()
 
         assert actions == []
 
@@ -79,7 +79,7 @@ class TestWindowSnapshotPoller:
         managed = list(WindowSnapshotPoller._MANAGED_OS_NAMES)
         windows = [_make_window(i, name, "1") for i, name in enumerate(managed, start=1)]
         mock_wm.list_windows.return_value = windows
-        poller._poll()
+        poller._poll_wm()
 
         assert actions == []
 
@@ -91,7 +91,7 @@ class TestWindowSnapshotPoller:
         poller._seen_ids = {42}
         mock_wm.list_windows.return_value = [_make_window(42, "Slack", "2")]
 
-        poller._poll()
+        poller._poll_wm()
 
         assert actions == []
 
@@ -106,7 +106,7 @@ class TestWindowSnapshotPoller:
             _make_window(2, "Microsoft Teams", "1"),
             _make_window(3, "Firefox", "Q"),
         ]
-        poller._poll()
+        poller._poll_wm()
 
         assert len(actions) == 3
         app_names = {a["app_name"] for a in actions}
@@ -119,19 +119,48 @@ class TestWindowSnapshotPoller:
         poller._seen_ids = set()
 
         mock_wm.list_windows.return_value = [_make_window(1, "Slack", "2")]
-        poller._poll()
-        poller._poll()  # same window, second poll
+        poller._poll_wm()
+        poller._poll_wm()  # same window, second poll
 
         assert len(actions) == 1  # only recorded once
 
-    def test_no_wm_does_not_crash(self):
+    def test_no_wm_fallback_records_new_app(self):
         poller, actions = self._make_poller()
-        # _wm is None — _run exits early, _poll is never called
-        with patch("ctx.daemon.server.WorkspaceManagerRegistry") as mock_reg_cls:
-            mock_reg_cls.return_value.detect_active.return_value = None
-            poller._run()  # should exit immediately without error
+        poller._wm = None
+        poller._seen_apps = {"Finder", "Safari"}  # pre-existing
 
-        assert actions == []
+        with patch("ctx.daemon.server._get_running_foreground_apps",
+                   return_value={"Finder", "Safari", "Slack"}):
+            poller._poll_fallback()
+
+        assert len(actions) == 1
+        assert actions[0]["app_name"] == "Slack"
+        assert actions[0]["type"] == "app_open"
+        assert "workspace" not in actions[0]
+
+    def test_no_wm_fallback_skips_managed(self):
+        poller, actions = self._make_poller()
+        poller._wm = None
+        poller._seen_apps = set()
+
+        with patch("ctx.daemon.server._get_running_foreground_apps",
+                   return_value={"Google Chrome", "Slack"}):
+            poller._poll_fallback()
+
+        assert len(actions) == 1
+        assert actions[0]["app_name"] == "Slack"
+
+    def test_no_wm_fallback_updates_seen_apps(self):
+        poller, actions = self._make_poller()
+        poller._wm = None
+        poller._seen_apps = set()
+
+        with patch("ctx.daemon.server._get_running_foreground_apps",
+                   return_value={"Slack", "Teams"}):
+            poller._poll_fallback()
+            poller._poll_fallback()  # second poll — same apps, nothing new
+
+        assert len(actions) == 2  # Slack + Teams, but only once each
 
     def test_action_has_timestamp(self):
         poller, actions = self._make_poller()
@@ -140,7 +169,7 @@ class TestWindowSnapshotPoller:
         poller._seen_ids = set()
         mock_wm.list_windows.return_value = [_make_window(1, "Photoshop", "3")]
 
-        poller._poll()
+        poller._poll_wm()
 
         assert "timestamp" in actions[0]
 
@@ -151,7 +180,7 @@ class TestWindowSnapshotPoller:
         poller._seen_ids = set()
         mock_wm.list_windows.return_value = [_make_window(99, "Blender", "5")]
 
-        poller._poll()
+        poller._poll_wm()
 
         assert actions[0]["workspace"] == "5"
 
