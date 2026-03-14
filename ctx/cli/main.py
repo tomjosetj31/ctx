@@ -154,13 +154,36 @@ def run(name: str) -> None:
         if ws is None:
             click.echo(f"Workspace '{name}' not found.", err=True)
             sys.exit(1)
-        action_count = ws.get("action_count", 0)
-        click.echo(
-            f"Replaying workspace '{name}'... ({action_count} actions) [stub]"
-        )
+        actions = store.get_actions(ws["id"])
         store.mark_last_run(name)
     finally:
         store.close()
+
+    from ctx.replayer.replayer import Replayer
+    replayer = Replayer(name, actions)
+    replayer.replay()
+
+
+# ---------------------------------------------------------------------------
+# ctx delete <name>
+# ---------------------------------------------------------------------------
+
+@cli.command("delete")
+@click.argument("name")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
+def delete(name: str, yes: bool) -> None:
+    """Delete a saved workspace named NAME."""
+    if not yes:
+        click.confirm(f"Delete workspace '{name}'?", abort=True)
+    store = _get_store()
+    try:
+        deleted = store.delete_workspace(name)
+    finally:
+        store.close()
+    if not deleted:
+        click.echo(f"Workspace '{name}' not found.", err=True)
+        sys.exit(1)
+    click.echo(f"Deleted workspace '{name}'.")
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +215,29 @@ def list_workspaces() -> None:
             f"{ws['name']:<{col_name}}  {ws['action_count']:>7}  "
             f"{ws['created_at']:>24}  {last_run}"
         )
+
+
+# ---------------------------------------------------------------------------
+# ctx import [file]
+# ---------------------------------------------------------------------------
+
+@cli.command("import")
+@click.argument("file", type=click.Path(exists=True), required=False)
+def import_workspace(file: str | None) -> None:
+    """Import a workspace from a YAML FILE (or stdin if omitted)."""
+    if file:
+        yaml_str = Path(file).read_text()
+    else:
+        if sys.stdin.isatty():
+            click.echo("Provide a FILE argument or pipe YAML via stdin.", err=True)
+            sys.exit(1)
+        yaml_str = sys.stdin.read()
+    store = _get_store()
+    try:
+        store.import_yaml(yaml_str)
+    finally:
+        store.close()
+    click.echo("Workspace imported successfully.")
 
 
 # ---------------------------------------------------------------------------
