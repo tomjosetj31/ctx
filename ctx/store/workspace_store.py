@@ -106,7 +106,7 @@ class WorkspaceStore:
             (
                 workspace_id,
                 action.get("type", "unknown"),
-                json.dumps(action.get("data", {})),
+                json.dumps({k: v for k, v in action.items() if k not in ("type", "timestamp")}),
                 action.get("timestamp", _now_iso()),
             )
             for action in actions
@@ -130,8 +130,14 @@ class WorkspaceStore:
         result = []
         for r in rows:
             d = dict(r)
-            d["data"] = json.loads(d["data"])
-            result.append(d)
+            action_dict = {
+                "id": d["id"],
+                "workspace_id": d["workspace_id"],
+                "type": d["type"],
+                "timestamp": d["timestamp"],
+            }
+            action_dict.update(json.loads(d["data"]))
+            result.append(action_dict)
         return result
 
     # ------------------------------------------------------------------
@@ -152,11 +158,7 @@ class WorkspaceStore:
                 "action_count": ws["action_count"],
             },
             "actions": [
-                {
-                    "type": a["type"],
-                    "data": a["data"],
-                    "timestamp": a["timestamp"],
-                }
+                {k: v for k, v in a.items() if k not in ("id", "workspace_id")}
                 for a in actions
             ],
         }
