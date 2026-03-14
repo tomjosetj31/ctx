@@ -32,12 +32,8 @@ from ctx.adapters.vpn.registry import VPNAdapterRegistry
 from ctx.adapters.browser.registry import BrowserAdapterRegistry
 from ctx.adapters.ide.registry import IDEAdapterRegistry
 from ctx.adapters.terminal.registry import TerminalAdapterRegistry
-from ctx.adapters.aerospace.adapter import (
-    AeroSpaceAdapter,
-    BROWSER_APP_NAMES,
-    IDE_APP_NAMES,
-    TERMINAL_APP_NAMES,
-)
+from ctx.adapters.wm.registry import WorkspaceManagerRegistry
+from ctx.adapters.wm.app_names import BROWSER_APP_NAMES, IDE_APP_NAMES, TERMINAL_APP_NAMES
 
 _CTX_DIR = Path.home() / ".ctx"
 _SOCKET_PATH = _CTX_DIR / "daemon.sock"
@@ -198,7 +194,7 @@ class BrowserPoller:
             logger.warning("BrowserPoller: could not initialise registry: %s", exc)
             return
 
-        aerospace = AeroSpaceAdapter() if AeroSpaceAdapter().is_available() else None
+        aerospace = WorkspaceManagerRegistry().detect_active()
 
         while not self._stop_event.is_set():
             try:
@@ -207,7 +203,7 @@ class BrowserPoller:
                 logger.warning("BrowserPoller: poll error: %s", exc)
             self._stop_event.wait(timeout=self._poll_interval)
 
-    def _poll(self, registry, aerospace: AeroSpaceAdapter | None) -> None:
+    def _poll(self, registry, aerospace: object | None) -> None:
         """Check current browser tabs and emit events for newly opened URLs."""
         for adapter in registry.available_adapters():
             current_urls = set(adapter.get_open_tabs())
@@ -282,7 +278,7 @@ class IDEPoller:
             logger.warning("IDEPoller: could not initialise registry: %s", exc)
             return
 
-        aerospace = AeroSpaceAdapter() if AeroSpaceAdapter().is_available() else None
+        aerospace = WorkspaceManagerRegistry().detect_active()
 
         while not self._stop_event.is_set():
             try:
@@ -291,7 +287,7 @@ class IDEPoller:
                 logger.warning("IDEPoller: poll error: %s", exc)
             self._stop_event.wait(timeout=self._poll_interval)
 
-    def _poll(self, registry, aerospace: AeroSpaceAdapter | None) -> None:
+    def _poll(self, registry, aerospace: object | None) -> None:
         """Check current IDE projects and emit events for newly opened paths."""
         for adapter in registry.available_adapters():
             current_paths = set(adapter.get_open_projects())
@@ -366,7 +362,7 @@ class TerminalPoller:
             logger.warning("TerminalPoller: could not initialise registry: %s", exc)
             return
 
-        aerospace = AeroSpaceAdapter() if AeroSpaceAdapter().is_available() else None
+        aerospace = WorkspaceManagerRegistry().detect_active()
 
         while not self._stop_event.is_set():
             try:
@@ -375,7 +371,7 @@ class TerminalPoller:
                 logger.warning("TerminalPoller: poll error: %s", exc)
             self._stop_event.wait(timeout=self._poll_interval)
 
-    def _poll(self, registry, aerospace: AeroSpaceAdapter | None) -> None:
+    def _poll(self, registry, aerospace: object | None) -> None:
         """Check current terminal sessions and emit events for newly opened dirs."""
         for adapter in registry.available_adapters():
             current_dirs = set(adapter.get_open_dirs())
