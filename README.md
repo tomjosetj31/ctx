@@ -16,7 +16,7 @@ A macOS CLI tool that records and replays developer workspace setups: browser ta
 ## Installation
 
 ```bash
-git clone https://github.com/tom/ctx
+git clone https://github.com/tomjosetj31/ctx
 cd ctx
 python -m venv .venv
 source .venv/bin/activate
@@ -42,7 +42,22 @@ ctx list
 
 # Inspect a workspace as YAML
 ctx show my-project
+
+# Delete a workspace
+ctx delete my-project
+
+# Import a workspace from a YAML file
+ctx import my-project.yaml
 ```
+
+## Supported Integrations
+
+| Category | Supported |
+|----------|-----------|
+| **Browser** | Chrome, Arc, Safari |
+| **VPN** | Tailscale, WireGuard, Cisco AnyConnect, Mullvad, OpenVPN |
+| **IDE** | VS Code, Cursor, Zed |
+| **Terminal** | iTerm2, Terminal.app, Warp, Kitty |
 
 ## Architecture
 
