@@ -397,6 +397,87 @@ class TerminalPoller:
             self._known_dirs[adapter.name] = current_dirs
 
 
+class WindowSnapshotPoller:
+    """Tracks ANY application that opens during recording using the window manager.
+
+    Works completely independent of specific adapters — if AeroSpace or yabai is
+    running, every new window that appears (Teams, Slack, Firefox, Photoshop,
+    Blender, anything) is recorded as an ``app_open`` event with its workspace.
+
+    Apps already handled by richer adapters (Chrome, Safari, VS Code, iTerm2,
+    etc.) are skipped here to avoid duplicate events.
+    """
+
+    # OS-level app names handled by specific pollers — skip them here
+    _MANAGED_OS_NAMES: frozenset[str] = frozenset({
+        # Browsers (BrowserPoller)
+        "Google Chrome", "Chromium", "Safari", "Arc",
+        # IDEs (IDEPoller)
+        "Code", "Cursor", "Zed",
+        # Terminals (TerminalPoller)
+        "iTerm2", "Terminal", "Warp", "kitty",
+    })
+
+    def __init__(
+        self,
+        actions: list[dict],
+        poll_interval: float = 2.0,
+    ) -> None:
+        self._actions = actions
+        self._poll_interval = poll_interval
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._seen_ids: set[int] = set()
+        self._wm: object | None = None
+
+    def start(self) -> None:
+        self._thread = threading.Thread(
+            target=self._run, daemon=True, name="window-snapshot-poller"
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=self._poll_interval + 1)
+
+    def _run(self) -> None:
+        self._wm = WorkspaceManagerRegistry().detect_active()
+        if self._wm is None:
+            logger.info("WindowSnapshotPoller: no WM detected — generic app tracking disabled")
+            return
+        # Seed with windows that are already open so we don't record pre-existing apps
+        try:
+            initial = self._wm.list_windows()
+            self._seen_ids = {w.window_id for w in initial}
+        except Exception as exc:
+            logger.warning("WindowSnapshotPoller: could not get initial window list: %s", exc)
+
+        while not self._stop_event.is_set():
+            try:
+                self._poll()
+            except Exception as exc:
+                logger.warning("WindowSnapshotPoller: poll error: %s", exc)
+            self._stop_event.wait(timeout=self._poll_interval)
+
+    def _poll(self) -> None:
+        windows = self._wm.list_windows()
+        for w in windows:
+            if w.window_id in self._seen_ids:
+                continue
+            self._seen_ids.add(w.window_id)
+            if w.app_name in self._MANAGED_OS_NAMES:
+                continue  # richer adapter already handles this app
+            action: dict = {
+                "type": "app_open",
+                "app_name": w.app_name,
+                "workspace": w.workspace,
+                "timestamp": _now_iso(),
+            }
+            self._actions.append(action)
+            logger.info("WindowSnapshotPoller: new app — %r workspace=%s", w.app_name, w.workspace)
+
+
 class RecorderDaemon:
     """In-process Unix socket server that records workspace actions."""
 
@@ -411,6 +492,7 @@ class RecorderDaemon:
         self._browser_poller: BrowserPoller | None = None
         self._ide_poller: IDEPoller | None = None
         self._terminal_poller: TerminalPoller | None = None
+        self._window_poller: WindowSnapshotPoller | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -454,6 +536,9 @@ class RecorderDaemon:
 
         self._terminal_poller = TerminalPoller(self._actions)
         self._terminal_poller.start()
+
+        self._window_poller = WindowSnapshotPoller(self._actions)
+        self._window_poller.start()
 
         self._loop()
 
@@ -556,6 +641,8 @@ class RecorderDaemon:
             self._ide_poller.stop()
         if self._terminal_poller is not None:
             self._terminal_poller.stop()
+        if self._window_poller is not None:
+            self._window_poller.stop()
 
         if self._sock:
             try:
